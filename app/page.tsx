@@ -110,7 +110,7 @@ export default function Home() {
   // 履歴をSupabaseから読み込み
   const loadHistoryFromApi = async () => {
     try {
-      const response = await fetch("/api/history");
+      const response = await fetch("/api/history", { cache: "no-store" });
       if (response.ok) {
         const data = await response.json();
         const convertedHistory: SearchHistory[] = (data.history || []).map((item: any) => ({
@@ -177,8 +177,10 @@ export default function Home() {
       }
       // 保存後に最新を再取得して共有状態を同期
       await loadHistoryFromApi();
+      return true;
     } catch (err) {
       console.error("履歴の保存に失敗しました:", err);
+      return false;
     }
   };
 
@@ -229,9 +231,13 @@ export default function Home() {
         result: data,
         checkedSteps: [],
       };
-      await saveHistoryToSupabase(newHistoryItem);
-      setHistory((prev) => [newHistoryItem, ...prev].slice(0, 100));
-      setCurrentHistoryId(newHistoryItem.id);
+      const ok = await saveHistoryToSupabase(newHistoryItem);
+      if (ok) {
+        // サーバー側の最新履歴を反映（saveHistoryToSupabase内で再取得済み）
+        setCurrentHistoryId(newHistoryItem.id);
+      } else {
+        alert("履歴の保存に失敗しました。時間をおいて再試行してください。");
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "検索に失敗しました");
     } finally {
