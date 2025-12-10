@@ -1,10 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
+import { createClient, SupabaseClient } from "@supabase/supabase-js";
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || "";
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "";
+export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
 
-const supabase = createClient(supabaseUrl, supabaseAnonKey);
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
+const getSupabase = (): SupabaseClient => {
+  if (!supabaseUrl || !supabaseAnonKey) {
+    throw new Error("Supabase URL / anon key are not set in environment variables.");
+  }
+  return createClient(supabaseUrl, supabaseAnonKey);
+};
 
 interface SearchHistory {
   id: string;
@@ -27,6 +35,7 @@ interface SearchHistory {
 // 履歴一覧を取得
 export async function GET(request: NextRequest) {
   try {
+    const supabase = getSupabase();
     const { data, error } = await supabase
       .from("search_history")
       .select("*")
@@ -66,6 +75,7 @@ export async function POST(request: NextRequest) {
       checkedSteps,
     } = body;
 
+    const supabase = getSupabase();
     const { data, error } = await supabase
       .from("search_history")
       .upsert({
@@ -106,6 +116,7 @@ export async function PATCH(request: NextRequest) {
     const body = await request.json();
     const { id, checkedSteps } = body;
 
+    const supabase = getSupabase();
     const { data, error } = await supabase
       .from("search_history")
       .update({ checked_steps: checkedSteps })
@@ -135,6 +146,7 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ error: "IDが指定されていません" }, { status: 400 });
     }
 
+    const supabase = getSupabase();
     const { error } = await supabase.from("search_history").delete().eq("id", id);
 
     if (error) {
