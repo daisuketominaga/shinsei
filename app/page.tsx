@@ -108,40 +108,42 @@ export default function Home() {
   const [loadingHistory, setLoadingHistory] = useState(true);
 
   // 履歴をSupabaseから読み込み
-  useEffect(() => {
-    const loadHistory = async () => {
-      try {
-        const response = await fetch("/api/history");
-        if (response.ok) {
-          const data = await response.json();
-          // Supabaseのデータ形式をアプリの形式に変換
-          const convertedHistory: SearchHistory[] = (data.history || []).map((item: any) => ({
-            id: item.id,
-            timestamp: item.timestamp,
-            businessType: item.business_type as BusinessType,
-            prefecture: item.prefecture,
-            city: item.city,
-            result: {
-              jurisdiction: item.jurisdiction,
-              jurisdiction_detail: item.jurisdiction_detail,
-              flow: item.flow,
-              summary: item.summary,
-              reference_url: item.reference_url,
-              reference_name: item.reference_name,
-              guideline_url: item.guideline_url,
-              guideline_name: item.guideline_name,
-            },
-            checkedSteps: item.checked_steps || [],
-          }));
-          setHistory(convertedHistory);
-        }
-      } catch (err) {
-        console.error("履歴の読み込みに失敗しました:", err);
-      } finally {
-        setLoadingHistory(false);
+  const loadHistoryFromApi = async () => {
+    try {
+      const response = await fetch("/api/history");
+      if (response.ok) {
+        const data = await response.json();
+        const convertedHistory: SearchHistory[] = (data.history || []).map((item: any) => ({
+          id: item.id,
+          timestamp: item.timestamp,
+          businessType: item.business_type as BusinessType,
+          prefecture: item.prefecture,
+          city: item.city,
+          result: {
+            jurisdiction: item.jurisdiction,
+            jurisdiction_detail: item.jurisdiction_detail,
+            flow: item.flow,
+            summary: item.summary,
+            reference_url: item.reference_url,
+            reference_name: item.reference_name,
+            guideline_url: item.guideline_url,
+            guideline_name: item.guideline_name,
+          },
+          checkedSteps: item.checked_steps || [],
+        }));
+        setHistory(convertedHistory);
+      } else {
+        console.error("履歴の取得に失敗しました:", await response.text());
       }
-    };
-    loadHistory();
+    } catch (err) {
+      console.error("履歴の読み込みに失敗しました:", err);
+    } finally {
+      setLoadingHistory(false);
+    }
+  };
+
+  useEffect(() => {
+    loadHistoryFromApi();
   }, []);
 
   // 履歴をSupabaseに保存
@@ -173,6 +175,8 @@ export default function Home() {
       if (!response.ok) {
         throw new Error("履歴の保存に失敗しました");
       }
+      // 保存後に最新を再取得して共有状態を同期
+      await loadHistoryFromApi();
     } catch (err) {
       console.error("履歴の保存に失敗しました:", err);
     }
