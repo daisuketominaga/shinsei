@@ -33,6 +33,9 @@ interface JurisdictionCheckResponse {
   source_url?: string;
 }
 
+// 神奈川県の訪問看護/訪問介護は「横浜・川崎・相模原・横須賀」以外は県が申請先
+const KANAGAWA_SPECIAL_CITIES = ["横浜市", "川崎市", "相模原市", "横須賀市"];
+
 const BUSINESS_TYPE_CONFIG = {
   residential_home: {
     name: "住宅型有料老人ホーム",
@@ -54,6 +57,35 @@ const BUSINESS_TYPE_CONFIG = {
   },
 };
 
+const resolveJurisdiction = (
+  businessType: keyof typeof BUSINESS_TYPE_CONFIG,
+  prefecture: string,
+  city: string
+) => {
+  // 神奈川県の訪問看護/訪問介護は指定4市以外は県
+  if (
+    (businessType === "visiting_nursing" || businessType === "visiting_care") &&
+    prefecture === "神奈川県"
+  ) {
+    if (KANAGAWA_SPECIAL_CITIES.some((c) => c === city || city.includes(c))) {
+      return {
+        jurisdiction: city,
+        isCity: true,
+        reason: `${city}は政令指定都市（横浜/川崎/相模原）または中核市（横須賀）に該当するため市が申請先です。`,
+      };
+    }
+    return {
+      jurisdiction: prefecture,
+      isCity: false,
+      reason: `${city}は政令指定都市・中核市ではないため神奈川県が申請先です。`,
+    };
+  }
+
+  // それ以外は一般ルール（政令市・中核市は市、それ以外は県）
+  const general = determineJurisdiction(prefecture, city);
+  return { jurisdiction: general.jurisdiction, isCity: general.isCity, reason: general.reason };
+};
+
 /**
  * Step 1: 申請先を調査・確認する
  */
@@ -64,9 +96,9 @@ async function verifyJurisdiction(
   businessType: keyof typeof BUSINESS_TYPE_CONFIG
 ): Promise<JurisdictionCheckResponse> {
   const config = BUSINESS_TYPE_CONFIG[businessType];
-  
-  // まず事前判定を行う（参考値として）
-  const preJudgment = determineJurisdiction(prefecture, city);
+
+  // まず事前判定を行う（参考値として）: 事業種別に応じた判定
+  const preJudgment = resolveJurisdiction(businessType, prefecture, city);
 
   const verifyPrompt = `あなたは日本の行政手続きに詳しい専門家です。${prefecture}${city}で${config.name}を新規開設する場合の「申請先・届出先」を、${prefecture}の公式サイトの情報を基に調査してください。
 
